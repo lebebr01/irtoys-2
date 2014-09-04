@@ -48,7 +48,7 @@ est.icl = function(resp, model, nqp, est.distr,
 
 # prepare and run a BILOG setup, return parameter estimates
 est.blm = function(resp, model, nqp, est.distr,
-  nch, a.prior, b.prior, c.prior, bilog.defaults, run.name, rasch) {
+  nch, a.prior, b.prior, c.prior, bilog.defaults, run.name, rasch, logistic = TRUE) {
   nit = ncol(resp)
   if (nit>9999) stop("cannot have more than 9999 items")
   f = paste(run.name,".blm", sep="")
@@ -65,34 +65,36 @@ est.blm = function(resp, model, nqp, est.distr,
     m = 2
     model = "2PL"
   }
-  cat(">GLOBAL DFName = '",d,"',\n",sep="",file=f,append=TRUE)
-  cat("   NPArm = ",m,",\n",sep="",file=f,append=TRUE) 
-  cat("   LOGistic\n",file=f,append=TRUE)
+  cat(">GLOBAL DFNAME = '",d,"',\n",sep="",file=f,append=TRUE)
+  cat("   NPARM = ",m,",\n",sep="",file=f,append=TRUE) 
+  if(logisitic){
+    cat("   LOGISTIC\n",file=f,append=TRUE)
+  }
   cat("   SAVE;\n",file=f,append=TRUE) 
-  cat(">SAVE PARm = '",p,"';\n",sep="",file=f,append=TRUE)
-  cat(">LENGTH NITems = (",nit,");\n",sep="",file=f,append=TRUE)   
-  cat(">INPUT NTOtal = ",nit,",\n",sep="",file=f,append=TRUE)
+  cat(">SAVE PARM = '",p,"';\n",sep="",file=f,append=TRUE)
+  cat(">LENGTH NITEMS = (",nit,");\n",sep="",file=f,append=TRUE)   
+  cat(">INPUT NTOTAL = ",nit,",\n",sep="",file=f,append=TRUE)
   if (m>2) cat("   NALT = ",nch,",\n",sep="",file=f,append=TRUE)
   if (any(is.na(resp))) {
-    cat("   NFName = 'myNF.ile'\n",file=f,append=TRUE)
+    cat("   NFNAME = 'myNF.ile'\n",file=f,append=TRUE)
     cat(paste(rep(".",ncol(resp)),collapse=""),"\n",file="myNF.ile")
   }
-  cat("   SAMple = ",np,",\n",sep="",file=f,append=TRUE) 
-  cat("   NIDchar = 6;\n",file=f,append=TRUE) 
+  cat("   SAMPLE = ",np,",\n",sep="",file=f,append=TRUE) 
+  cat("   NIDCHAR = 6;\n",file=f,append=TRUE) 
   ifoo = paste("(ITEM",sprintf("%04d",1),"(1)ITEM",sprintf("%04d",nit),")",sep="")
-  cat(">ITEMS INAmes = ",ifoo,";\n",sep="",file=f,append=TRUE)
-  cat(">TEST1 TNAme = 'TEST',\n",file=f,append=TRUE)  
+  cat(">ITEMS INAMES = ",ifoo,";\n",sep="",file=f,append=TRUE)
+  cat(">TEST1 TNAME = 'TEST',\n",file=f,append=TRUE)  
   ifoo = paste("(",1,"(1)",nit,")",sep="")
-  cat("   INUmber = ",ifoo,";\n",sep="",file=f,append=TRUE) 
+  cat("   INUMBER = ",ifoo,";\n",sep="",file=f,append=TRUE) 
   cat("(6A1,",nit,"A1)\n",sep="",file=f,append=TRUE) 
-  cat(">CALIB NQPt = ",nqp,",\n",sep="",file=f,append=TRUE)
-  if (est.distr) cat("   EMPirical,\n",file=f,append=TRUE) 
+  cat(">CALIB NQPT = ",nqp,",\n",sep="",file=f,append=TRUE)
+  if (est.distr) cat("   EMPIRICAL,\n",file=f,append=TRUE) 
   if (m==1 && rasch) cat("   RASCH,\n",file=f,append=TRUE) 
-  if (b.prior) cat("   TPRior,\n",file=f,append=TRUE) 
-  if (m>1 && !a.prior) cat("   NOSprior,\n",file=f,append=TRUE) 
-  if (m>2 && !c.prior) cat("   NOGprior,\n",file=f,append=TRUE) 
+  if (b.prior) cat("   TPRIOR,\n",file=f,append=TRUE) 
+  if (m>1 && !a.prior) cat("   NOSPRIOR,\n",file=f,append=TRUE) 
+  if (m>2 && !c.prior) cat("   NOGPRIOR,\n",file=f,append=TRUE) 
   cat("   CYCles = 3000,\n",sep="",file=f,append=TRUE)
-  cat("   NEWton = 0;\n",file=f,append=TRUE)
+  cat("   NEWTON = 0;\n",file=f,append=TRUE)
   if (Sys.info()["sysname"]=="Linux") {
   	system(paste("wine","BLM1.EXE",run.name))
   	system(paste("wine","BLM2.EXE",run.name))
