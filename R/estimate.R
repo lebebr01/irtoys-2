@@ -48,12 +48,14 @@ est.icl = function(resp, model, nqp, est.distr,
 
 # prepare and run a BILOG setup, return parameter estimates
 est.blm = function(resp, model, nqp, est.distr,
-  nch, a.prior, b.prior, c.prior, bilog.defaults, run.name, rasch, logistic = TRUE) {
+  nch, a.prior, b.prior, c.prior, bilog.defaults, run.name, rasch, logistic,
+  iname, group, data.str, reference) {
   nit = ncol(resp)
   if (nit>9999) stop("cannot have more than 9999 items")
   f = paste(run.name,".blm", sep="")
   d = paste(run.name,".dat", sep="")
-  p = paste(toupper(run.name),".BLMP",sep="")
+  p = paste(toupper(run.name),".PAR",sep="")
+  s = paste(toupper(run.name), ".SCO", sep = "")
   np = nrow(resp)
   if (np>999999) stop("cannot have more than 999999 observations")
   resp = cbind(sprintf("%06d",1:np),resp)
@@ -65,15 +67,20 @@ est.blm = function(resp, model, nqp, est.distr,
     m = 2
     model = "2PL"
   }
+  
   cat(">GLOBAL DFNAME = '",d,"',\n",sep="",file=f,append=TRUE)
   cat("   NPARM = ",m,",\n",sep="",file=f,append=TRUE) 
   if(logisitic){
     cat("   LOGISTIC\n",file=f,append=TRUE)
   }
   cat("   SAVE;\n",file=f,append=TRUE) 
-  cat(">SAVE PARM = '",p,"';\n",sep="",file=f,append=TRUE)
+  
+  cat(">SAVE SCORE = '",s,"', PARM = '",p,"';\n",sep="",file=f,append=TRUE)
+  
   cat(">LENGTH NITEMS = (",nit,");\n",sep="",file=f,append=TRUE)   
+  
   cat(">INPUT NTOTAL = ",nit,",\n",sep="",file=f,append=TRUE)
+  
   if (m>2) cat("   NALT = ",nch,",\n",sep="",file=f,append=TRUE)
   if (any(is.na(resp))) {
     cat("   NFNAME = 'myNF.ile'\n",file=f,append=TRUE)
@@ -81,20 +88,40 @@ est.blm = function(resp, model, nqp, est.distr,
   }
   cat("   SAMPLE = ",np,",\n",sep="",file=f,append=TRUE) 
   cat("   NIDCHAR = 6;\n",file=f,append=TRUE) 
-  ifoo = paste("(ITEM",sprintf("%04d",1),"(1)ITEM",sprintf("%04d",nit),")",sep="")
-  cat(">ITEMS INAMES = ",ifoo,";\n",sep="",file=f,append=TRUE)
-  cat(">TEST1 TNAME = 'TEST',\n",file=f,append=TRUE)  
-  ifoo = paste("(",1,"(1)",nit,")",sep="")
-  cat("   INUMBER = ",ifoo,";\n",sep="",file=f,append=TRUE) 
-  cat("(6A1,",nit,"A1)\n",sep="",file=f,append=TRUE) 
+  
+  if(is.null(iname)){
+    ifoo = paste("(ITEM",sprintf("%04d",1),"(1)ITEM",sprintf("%04d",nit),")",sep="")
+    cat(">ITEMS INAMES = ",ifoo,";\n",sep="",file=f,append=TRUE)
+  } else {
+    cat(">ITEMS INAMES = ", iname, ";\n", sep = "", file = f, append = TRUE)
+  }
+ 
+  if(is.null(group)){
+    cat(">TEST1 TNAME = 'TEST',\n",file=f,append=TRUE) 
+    ifoo = paste("(",1,"(1)",nit,")",sep="")
+    cat("   INUM = ",ifoo,";\n",sep="",file=f,append=TRUE) 
+  } else {
+    cat(">TEST TNAME = 'TEST';\n", file = f, append = TRUE)
+    cat(paste(">", attr(group, "names"), " ", unlist(group), ";\n", sep = ""),
+        file = f, append = TRUE)
+  }
+  
+  
+  if(is.null(data.str)){
+    cat("(6A1,",nit,"A1)\n",sep="",file=f,append=TRUE) 
+  } else {
+    cat(data.str, file = f, append = TRUE)
+  }
+  
   cat(">CALIB NQPT = ",nqp,",\n",sep="",file=f,append=TRUE)
   if (est.distr) cat("   EMPIRICAL,\n",file=f,append=TRUE) 
   if (m==1 && rasch) cat("   RASCH,\n",file=f,append=TRUE) 
   if (b.prior) cat("   TPRIOR,\n",file=f,append=TRUE) 
   if (m>1 && !a.prior) cat("   NOSPRIOR,\n",file=f,append=TRUE) 
   if (m>2 && !c.prior) cat("   NOGPRIOR,\n",file=f,append=TRUE) 
-  cat("   CYCles = 3000,\n",sep="",file=f,append=TRUE)
+  cat("   CYCLE = 3000,\n",sep="",file=f,append=TRUE)
   cat("   NEWTON = 0;\n",file=f,append=TRUE)
+  
   if (Sys.info()["sysname"]=="Linux") {
   	system(paste("wine","BLM1.EXE",run.name))
   	system(paste("wine","BLM2.EXE",run.name))
@@ -221,6 +248,16 @@ est.ltm = function(resp, model, nqp, rasch) {
 #' written by ICL or BILOG. Default is \code{"mymodel"}. Change to something
 #' else to keep the outputs of ICL of BILOG for further use. Ignored when
 #' \code{engine="ltm"}
+#' @param logistic A logical (TRUE/FALSE) indicating whether to use the logistic
+#' metric or not.
+#' @param iname A character vector specifying the item names. This is specified
+#' in a fortran like statement.
+#' @param group A list of character vectors specifying the group bilog syntax.
+#' @param data.str An optional vector allowing for flexible data specification
+#' of the \code{resp} matrix. A fortran statement is needed to describe the input
+#' data.
+#' @param reference An optional vector specifying which group is the reference group
+#' when calibrating.
 #' @return A list with two elements, \code{est} and \code{se}, for the parameter 
 #' estimates and their standard errors, correspondingly. Each element is a  
 #' matrix with one row per item, and three columns: [,1] item
@@ -248,7 +285,8 @@ est.ltm = function(resp, model, nqp, rasch) {
 #' 
 est = function(resp, model="2PL", engine="icl", nqp=20, est.distr=FALSE,
   nch=5, a.prior=TRUE, b.prior=FALSE, c.prior=TRUE, 
-  bilog.defaults=TRUE, rasch=FALSE, run.name="mymodel") {
+  bilog.defaults=TRUE, rasch=FALSE, run.name="mymodel", logistic = TRUE,
+  iname = NULL, group = NULL, data.str = NULL, reference = NULL) {
   res = switch(engine,
     "icl"=  est.icl(resp, model, nqp, est.distr, nch, a.prior, b.prior, c.prior, bilog.defaults, run.name),
     "bilog"=est.blm(resp, model, nqp, est.distr, nch, a.prior, b.prior, c.prior, bilog.defaults, run.name, rasch),
